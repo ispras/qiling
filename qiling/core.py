@@ -38,6 +38,7 @@ class Qiling(QlCoreHooks, QlCoreStructs):
             ostype=None,
             archtype=None,
             bigendian=False,
+            archbit_extra=None,
             verbose=QL_VERBOSE.DEFAULT,
             profile=None,
             console=True,
@@ -72,6 +73,7 @@ class Qiling(QlCoreHooks, QlCoreStructs):
         self._archtype = archtype
         self._archendian = None
         self._archbit = None
+        self._archbit_extra = archbit_extra
         self._pointersize = None
         self._profile = profile
         self._console = console
