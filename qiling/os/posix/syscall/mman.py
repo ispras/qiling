@@ -51,6 +51,21 @@ def ql_syscall_mprotect(ql: Qiling, start: int, mlen: int, prot: int):
 
     return 0
 
+def next_addr_for_mmap(ql, size):
+    def find_mapping(ql, addr, size):
+        begin = addr
+        end = addr + size
+        for lbound, ubound, _, _, _ in ql.mem.map_info:
+            if (lbound <= begin < ubound) or (lbound < end <= ubound) or (begin <= lbound < ubound <= end):
+                return [lbound, ubound]
+        return None
+    addr = ql.loader.mmap_address
+    while True:
+        mapping = find_mapping(ql, addr, size)
+        if mapping == None: break
+        addr = mapping[1]
+    ql.loader.mmap_address = addr + size
+    return addr
 
 def syscall_mmap_impl(ql: Qiling, addr: int, mlen: int, prot: int, flags: int, fd: int, pgoffset: int, ver: int):
     MAP_SHARED = 0x01
@@ -105,8 +120,8 @@ def syscall_mmap_impl(ql: Qiling, addr: int, mlen: int, prot: int, flags: int, f
         if (flags & MAP_FIXED) > 0:
             mmap_base = addr
         else:
-            mmap_base = ql.loader.mmap_address
-        ql.loader.mmap_address = mmap_base + eff_mmap_size
+            mmap_base = next_addr_for_mmap(ql, eff_mmap_size)
+
         ql.log.debug("%s - mapping needed for 0x%x" % (api_name, addr))
         try:
             ql.mem.map(mmap_base, eff_mmap_size, info=("[syscall_%s]" % api_name))
