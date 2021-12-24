@@ -39,8 +39,14 @@ class QlDrCoverage(QlBaseCoverage):
     @staticmethod
     def block_callback(ql, address, size, self):
         for mod_id, mod in enumerate(ql.loader.images):
+            gg=0
+            for i in range(len(self.basic_blocks)):
+                if ((address - ql.os.elf_entry) == self.basic_blocks[i].start):
+                    gg=1
+            if (gg==1):
+                break 
             if mod.base <= address <= mod.end:
-                ent = bb_entry(address - mod.base, size, mod_id)
+                ent = bb_entry(address - ql.os.elf_entry, size, mod_id)
                 self.basic_blocks.append(ent)
                 break
 
@@ -51,13 +57,14 @@ class QlDrCoverage(QlBaseCoverage):
         self.ql.hook_del(self.bb_callback)
 
     def dump_coverage(self, coverage_file):
-        with open(coverage_file, "wb") as cov:
-            cov.write(f"DRCOV VERSION: {self.drcov_version}\n".encode())
-            cov.write(f"DRCOV FLAVOR: {self.drcov_flavor}\n".encode())
-            cov.write(f"Module Table: version {self.drcov_version}, count {len(self.ql.loader.images)}\n".encode())
-            cov.write("Columns: id, base, end, entry, checksum, timestamp, path\n".encode())
+        with open(coverage_file, "w") as cov:
+            cov.write(f"DRCOV VERSION: {self.drcov_version}\n")
+            cov.write(f"DRCOV FLAVOR: {self.drcov_flavor}\n")
+            cov.write(f"Module Table: version {self.drcov_version}, count {len(self.ql.loader.images)}\n")
+            cov.write("Columns: id, base, end, entry, checksum, timestamp, path\n")
             for mod_id, mod in enumerate(self. ql.loader.images):
-                cov.write(f"{mod_id}, {mod.base}, {mod.end}, 0, 0, 0, {mod.path}\n".encode())
-            cov.write(f"BB Table: {len(self.basic_blocks)} bbs\n".encode())
+                cov.write(f"{mod_id}, {mod.base}, {mod.end}, 0, 0, 0, {mod.path}\n")
+            cov.write(f"BB Table: {len(self.basic_blocks)} bbs\n")
+            cov.write("module id, start, size:\n")
             for bb in self.basic_blocks:
-                cov.write(bytes(bb))
+                cov.write("module["+str(bb.mod_id)+"]: "+"0x"+format((bb.start), '014x') + ", "+str(bb.size)+'\n')
