@@ -16,7 +16,6 @@ class bb_entry(Structure):
         ("size",   c_uint16),
         ("mod_id", c_uint16)
     ]
-
 class QlDrCoverage(QlBaseCoverage):
     """
     Collects emulated code coverage and formats it in accordance with the DynamoRIO based
@@ -34,19 +33,23 @@ class QlDrCoverage(QlBaseCoverage):
         self.drcov_version = 2
         self.drcov_flavor  = 'drcov'
         self.basic_blocks  = []
+        self.basic_blocks2  = []
         self.bb_callback   = None
 
     @staticmethod
     def block_callback(ql, address, size, self):
         for mod_id, mod in enumerate(ql.loader.images):
+            if mod.base <= address <= mod.end:
+                ent = bb_entry(address - mod.base, size, mod_id)
+                self.basic_blocks2.append(ent)
             gg=0
             for i in range(len(self.basic_blocks)):
-                if ((address - ql.os.elf_entry) == self.basic_blocks[i].start):
+                if ((address - mod.base) == self.basic_blocks[i].start):
                     gg=1
             if (gg==1):
                 break 
             if mod.base <= address <= mod.end:
-                ent = bb_entry(address - ql.os.elf_entry, size, mod_id)
+                ent = bb_entry(address - mod.base, size, mod_id)
                 self.basic_blocks.append(ent)
                 break
 
@@ -56,15 +59,36 @@ class QlDrCoverage(QlBaseCoverage):
     def deactivate(self):
         self.ql.hook_del(self.bb_callback)
 
-    def dump_coverage(self, coverage_file):
-        with open(coverage_file, "w") as cov:
-            cov.write(f"DRCOV VERSION: {self.drcov_version}\n")
-            cov.write(f"DRCOV FLAVOR: {self.drcov_flavor}\n")
-            cov.write(f"Module Table: version {self.drcov_version}, count {len(self.ql.loader.images)}\n")
-            cov.write("Columns: id, base, end, entry, checksum, timestamp, path\n")
-            for mod_id, mod in enumerate(self. ql.loader.images):
-                cov.write(f"{mod_id}, {mod.base}, {mod.end}, 0, 0, 0, {mod.path}\n")
-            cov.write(f"BB Table: {len(self.basic_blocks)} bbs\n")
-            cov.write("module id, start, size:\n")
-            for bb in self.basic_blocks:
-                cov.write("module["+str(bb.mod_id)+"]: "+"0x"+format((bb.start), '014x') + ", "+str(bb.size)+'\n')
+    def dump_coverage(self, coverage_file, trace_mode, text_format):
+        if(text_format==False):
+            with open(coverage_file, "wb") as cov:
+                cov.write(f"DRCOV VERSION: {self.drcov_version}\n".encode())
+                cov.write(f"DRCOV FLAVOR: {self.drcov_flavor}\n".encode())
+                cov.write(f"Module Table: version {self.drcov_version}, count {len(self.ql.loader.images)}\n".encode())
+                cov.write("Columns: id, base, end, entry, checksum, timestamp, path\n".encode())
+                for mod_id, mod in enumerate(self. ql.loader.images):
+                    cov.write(f"{mod_id}, {mod.base}, {mod.end}, 0, 0, 0, {mod.path}\n".encode())
+                cov.write(f"BB Table: {len(self.basic_blocks)} bbs\n".encode())
+                if(trace_mode == False):
+                    for bb in self.basic_blocks2:
+                        cov.write(bytes(bb))   
+                else:
+                    for bb in self.basic_blocks:
+                        cov.write(bytes(bb)) 
+        else:
+            with open(coverage_file, "w") as cov:
+                cov.write(f"DRCOV VERSION: {self.drcov_version}\n")
+                cov.write(f"DRCOV FLAVOR: {self.drcov_flavor}\n")
+                cov.write(f"Module Table: version {self.drcov_version}, count {len(self.ql.loader.images)}\n")
+                cov.write("Columns: id, base, end, entry, checksum, timestamp, path\n")
+                for mod_id, mod in enumerate(self. ql.loader.images):
+                    cov.write(f"{mod_id}, {mod.base}, {mod.end}, 0, 0, 0, {mod.path}\n")
+                cov.write(f"BB Table: {len(self.basic_blocks)} bbs\n")
+                cov.write("module id, start, size:\n")
+                if(trace_mode == False):
+                    for bb in self.basic_blocks2:
+                        cov.write("module["+str(bb.mod_id)+"]: "+"0x"+format((bb.start), '014x') + ", "+str(bb.size)+'\n')
+                else:
+                    for bb in self.basic_blocks:
+                        cov.write("module["+str(bb.mod_id)+"]: "+"0x"+format((bb.start), '014x') + ", "+str(bb.size)+'\n')
+           
