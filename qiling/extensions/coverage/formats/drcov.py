@@ -16,6 +16,10 @@ class bb_entry(Structure):
         ("size",   c_uint16),
         ("mod_id", c_uint16)
     ]
+    def __eq__(self, other):
+        return (self.start==other.start and self.size==other.size and self.mod_id==other.mod_id)
+    def __hash__(self):
+        return (hash((self.start,self.size,self.mod_id)))
 class QlDrCoverage(QlBaseCoverage):
     """
     Collects emulated code coverage and formats it in accordance with the DynamoRIO based
@@ -32,7 +36,7 @@ class QlDrCoverage(QlBaseCoverage):
         self.ql            = ql
         self.drcov_version = 2
         self.drcov_flavor  = 'drcov'
-        self.basic_blocks  = []
+        self.basic_blocks  = set()
         self.basic_blocks2  = []
         self.bb_callback   = None
 
@@ -42,16 +46,10 @@ class QlDrCoverage(QlBaseCoverage):
             if mod.base <= address <= mod.end:
                 ent = bb_entry(address - mod.base, size, mod_id)
                 self.basic_blocks2.append(ent)
-            gg=0
-            for i in range(len(self.basic_blocks)):
-                if ((address - mod.base) == self.basic_blocks[i].start):
-                    gg=1
-            if (gg==1):
-                break 
-            if mod.base <= address <= mod.end:
-                ent = bb_entry(address - mod.base, size, mod_id)
-                self.basic_blocks.append(ent)
-                break
+                if (ent in self.basic_blocks):
+                    break
+                else:
+                    self.basic_blocks.add(ent)
 
     def activate(self):
         self.bb_callback = self.ql.hook_block(self.block_callback, user_data=self)
