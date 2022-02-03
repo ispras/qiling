@@ -32,7 +32,7 @@ class CoverageFactory():
 factory = CoverageFactory()
 
 @contextmanager
-def collect_coverage(ql, name, coverage_file, trace_mode = False, text_format = False):
+def collect_coverage(ql, name, coverage_file):
     """
     Context manager for emulating a given piece of code with coverage collection turned on.
     Example:
@@ -47,4 +47,4 @@ def collect_coverage(ql, name, coverage_file, trace_mode = False, text_format = 
     finally:
         cov.deactivate()
         if coverage_file:
-            cov.dump_coverage(coverage_file, trace_mode, text_format)
+            cov.dump_coverage(coverage_file)
