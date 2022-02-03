@@ -20,6 +20,7 @@ class bb_entry(Structure):
         return (self.start==other.start and self.size==other.size and self.mod_id==other.mod_id)
     def __hash__(self):
         return (hash((self.start,self.size,self.mod_id)))
+
 class QlDrCoverage(QlBaseCoverage):
     """
     Collects emulated code coverage and formats it in accordance with the DynamoRIO based
@@ -36,57 +37,71 @@ class QlDrCoverage(QlBaseCoverage):
         self.ql            = ql
         self.drcov_version = 2
         self.drcov_flavor  = 'drcov'
-        self.basic_blocks  = set()
-        self.basic_blocks2  = []
+        self.basic_blocks  = None
         self.bb_callback   = None
+        # switch - trace or coverage (list or set of blocks)
+        self.trace_mode = True
+        # switch - text or binary format for the list of blocks in the file
+        self.text_format = False
+        # sometimes we need to log all blocks, even if ostensibly they don't belong to any module
+        # (they are logged as blocks of the "all-memory" module)
+        self.all_memory_module = False
+        self.memory_mod = None
 
     @staticmethod
     def block_callback(ql, address, size, self):
-        for mod_id, mod in enumerate(ql.loader.images):
+        images = list(ql.loader.images)
+        if self.all_memory_module:
+            images.append(self.memory_mod)
+        for mod_id, mod in enumerate(images):
             if mod.base <= address <= mod.end:
                 ent = bb_entry(address - mod.base, size, mod_id)
-                self.basic_blocks2.append(ent)
-                if (ent in self.basic_blocks):
-                    break
+                if self.trace_mode:
+                    self.basic_blocks.append(ent)
                 else:
                     self.basic_blocks.add(ent)
+                break
 
     def activate(self):
+        if self.trace_mode:
+            self.basic_blocks = list()
+        else:
+            self.basic_blocks = set()
+        if self.all_memory_module:
+            # fake module corresponding to the whole memory
+            class MemoryMod:
+                def __init__(self, base, end, path):
+                    self.base = base
+                    self.end = end
+                    self.path = path
+            self.memory_mod = MemoryMod(0, 0xFFFFFFFFFFFFFFFF, 'memory')
         self.bb_callback = self.ql.hook_block(self.block_callback, user_data=self)
 
     def deactivate(self):
         self.ql.hook_del(self.bb_callback)
 
-    def dump_coverage(self, coverage_file, trace_mode, text_format):
-        if(text_format==False):
-            with open(coverage_file, "wb") as cov:
-                cov.write(f"DRCOV VERSION: {self.drcov_version}\n".encode())
-                cov.write(f"DRCOV FLAVOR: {self.drcov_flavor}\n".encode())
-                cov.write(f"Module Table: version {self.drcov_version}, count {len(self.ql.loader.images)}\n".encode())
-                cov.write("Columns: id, base, end, entry, checksum, timestamp, path\n".encode())
-                for mod_id, mod in enumerate(self. ql.loader.images):
-                    cov.write(f"{mod_id}, {mod.base}, {mod.end}, 0, 0, 0, {mod.path}\n".encode())
-                cov.write(f"BB Table: {len(self.basic_blocks)} bbs\n".encode())
-                if(trace_mode == False):
-                    for bb in self.basic_blocks2:
-                        cov.write(bytes(bb))   
-                else:
-                    for bb in self.basic_blocks:
-                        cov.write(bytes(bb)) 
-        else:
-            with open(coverage_file, "w") as cov:
-                cov.write(f"DRCOV VERSION: {self.drcov_version}\n")
-                cov.write(f"DRCOV FLAVOR: {self.drcov_flavor}\n")
-                cov.write(f"Module Table: version {self.drcov_version}, count {len(self.ql.loader.images)}\n")
-                cov.write("Columns: id, base, end, entry, checksum, timestamp, path\n")
-                for mod_id, mod in enumerate(self. ql.loader.images):
-                    cov.write(f"{mod_id}, {mod.base}, {mod.end}, 0, 0, 0, {mod.path}\n")
-                cov.write(f"BB Table: {len(self.basic_blocks)} bbs\n")
+    def dump_coverage(self, coverage_file):
+
+        images = list(self.ql.loader.images)
+        if self.all_memory_module:
+            images.append(self.memory_mod)
+
+        def string(s): return s if self.text_format else s.encode()
+
+        with open(coverage_file, "w" if self.text_format else "wb") as cov:
+            cov.write(string(f"DRCOV VERSION: {self.drcov_version}\n"))
+            cov.write(string(f"DRCOV FLAVOR: {self.drcov_flavor}\n"))
+            cov.write(string(f"Module Table: version {self.drcov_version}, count {len(images)}\n"))
+            cov.write(string("Columns: id, base, end, entry, checksum, timestamp, path\n"))
+            for mod_id, mod in enumerate(images):
+                cov.write(string(f"{mod_id}, 0x{mod.base:016x}, 0x{mod.end:016x}, 0, 0, 0, {mod.path}\n"))
+            cov.write(string(f"BB Table: {len(self.basic_blocks)} bbs\n"))
+            if self.text_format:
                 cov.write("module id, start, size:\n")
-                if(trace_mode == False):
-                    for bb in self.basic_blocks2:
-                        cov.write("module["+str(bb.mod_id)+"]: "+"0x"+format((bb.start), '014x') + ", "+str(bb.size)+'\n')
+            for bb in self.basic_blocks:
+                if self.text_format:
+                    cov.write("module["+str(bb.mod_id)+"]: "+"0x"+format((bb.start), '016x') + ", "+str(bb.size)+'\n')
                 else:
-                    for bb in self.basic_blocks:
-                        cov.write("module["+str(bb.mod_id)+"]: "+"0x"+format((bb.start), '014x') + ", "+str(bb.size)+'\n')
+                    cov.write(bytes(bb))   
+
            
