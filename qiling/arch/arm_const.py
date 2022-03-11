@@ -6,6 +6,11 @@
 from unicorn.arm_const import *
 from enum import IntEnum
 
+def safe_name(n):
+    if n in globals():
+        return globals()[n]
+    return None
+
 reg_map = {
             "r0": UC_ARM_REG_R0,
             "r1": UC_ARM_REG_R1, 
@@ -24,17 +29,17 @@ reg_map = {
             "lr": UC_ARM_REG_LR,
             "pc": UC_ARM_REG_PC,
             # cortex-M Special Register
-            "msp": UC_ARM_REG_MSP,
-            "psp": UC_ARM_REG_PSP,
-            "xpsr": UC_ARM_REG_XPSR,
-            "xpsr_nzcvqg": UC_ARM_REG_XPSR_NZCVQG,
-            "apsr": UC_ARM_REG_APSR,
-            "ipsr": UC_ARM_REG_IPSR,
-            "epsr": UC_ARM_REG_EPSR,
-            "primask": UC_ARM_REG_PRIMASK,
-            "faultmask": UC_ARM_REG_FAULTMASK,
-            "basepri": UC_ARM_REG_BASEPRI,
-            "control": UC_ARM_REG_CONTROL,
+            "msp": safe_name("UC_ARM_REG_MSP"),
+            "psp": safe_name("UC_ARM_REG_PSP"),
+            "xpsr": safe_name("UC_ARM_REG_XPSR"),
+            "xpsr_nzcvqg": safe_name("UC_ARM_REG_XPSR_NZCVQG"),
+            "apsr": safe_name("UC_ARM_REG_APSR"),
+            "ipsr": safe_name("UC_ARM_REG_IPSR"),
+            "epsr": safe_name("UC_ARM_REG_EPSR"),
+            "primask": safe_name("UC_ARM_REG_PRIMASK"),
+            "faultmask": safe_name("UC_ARM_REG_FAULTMASK"),
+            "basepri": safe_name("UC_ARM_REG_BASEPRI"),
+            "control": safe_name("UC_ARM_REG_CONTROL"),
             # CPSR needs to be at offset 25 for GDB, see https://sourceware.org/git/?p=binutils-gdb.git;a=blob;f=gdb/arch/arm.h;h=fa589fd0582c0add627a068e6f4947a909c45e86;hb=HEAD#l34
             # The fp registers inbetween have become obsolete
             "f0": UC_ARM_REG_INVALID,
@@ -51,6 +56,8 @@ reg_map = {
             "c13_c0_3": UC_ARM_REG_C13_C0_3,
             "fpexc": UC_ARM_REG_FPEXC,
 }
+
+reg_map = dict(filter(lambda i: i[1] != None, reg_map.items()))
 
 class IRQ(IntEnum):
     NMI = -14
