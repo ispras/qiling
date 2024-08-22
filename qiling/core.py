@@ -39,6 +39,7 @@ class Qiling(QlCoreHooks, QlCoreStructs):
             archtype=None,
             bigendian=False,
             archbit_extra=None,
+            mips_n32=False,
             verbose=QL_VERBOSE.DEFAULT,
             profile=None,
             console=True,
